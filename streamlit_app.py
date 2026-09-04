@@ -1,151 +1,140 @@
-import streamlit as st
+import numpy as np
 import pandas as pd
-import math
-from pathlib import Path
+import plotly.express as px
+import streamlit as st
 
-# Set the title and favicon that appear in the Browser's tab bar.
 st.set_page_config(
-    page_title='GDP dashboard',
-    page_icon=':earth_americas:', # This is an emoji shortcode. Could be a URL too.
+    page_title="Executive Business Intelligence Dashboard",
+    page_icon="📊",
+    layout="wide",
 )
 
-# -----------------------------------------------------------------------------
-# Declare some useful functions.
 
 @st.cache_data
-def get_gdp_data():
-    """Grab GDP data from a CSV file.
+def load_data():
+    np.random.seed(42)
+    dates = pd.date_range(start="2026-01-01", end="2026-08-31", freq="D")
+    regions = ["North America", "Europe", "Asia-Pacific", "Latin America"]
+    categories = ["Enterprise", "Mid-Market", "SMB"]
 
-    This uses caching to avoid having to read the file every time. If we were
-    reading from an HTTP endpoint instead of a file, it's a good idea to set
-    a maximum age to the cache with the TTL argument: @st.cache_data(ttl='1d')
-    """
+    data = []
+    for date in dates:
+        for _ in range(np.random.randint(5, 15)):
+            data.append(
+                {
+                    "Date": date,
+                    "Region": np.random.choice(regions),
+                    "Category": np.random.choice(categories),
+                    "Revenue": np.random.uniform(100, 5000),
+                    "User_ID": np.random.randint(1000, 9999),
+                    "Is_Churned": np.random.choice([0, 1], p=[0.93, 0.07]),
+                }
+            )
+    return pd.DataFrame(data)
 
-    # Instead of a CSV on disk, you could read from an HTTP endpoint here too.
-    DATA_FILENAME = Path(__file__).parent/'data/gdp_data.csv'
-    raw_gdp_df = pd.read_csv(DATA_FILENAME)
 
-    MIN_YEAR = 1960
-    MAX_YEAR = 2022
+df_raw = load_data()
 
-    # The data above has columns like:
-    # - Country Name
-    # - Country Code
-    # - [Stuff I don't care about]
-    # - GDP for 1960
-    # - GDP for 1961
-    # - GDP for 1962
-    # - ...
-    # - GDP for 2022
-    #
-    # ...but I want this instead:
-    # - Country Name
-    # - Country Code
-    # - Year
-    # - GDP
-    #
-    # So let's pivot all those year-columns into two: Year and GDP
-    gdp_df = raw_gdp_df.melt(
-        ['Country Code'],
-        [str(x) for x in range(MIN_YEAR, MAX_YEAR + 1)],
-        'Year',
-        'GDP',
-    )
-
-    # Convert years from string to integers
-    gdp_df['Year'] = pd.to_numeric(gdp_df['Year'])
-
-    return gdp_df
-
-gdp_df = get_gdp_data()
-
-# -----------------------------------------------------------------------------
-# Draw the actual page
-
-# Set the title that appears at the top of the page.
-'''
-# :earth_americas: GDP dashboard
-
-Browse GDP data from the [World Bank Open Data](https://data.worldbank.org/) website. As you'll
-notice, the data only goes to 2022 right now, and datapoints for certain years are often missing.
-But it's otherwise a great (and did I mention _free_?) source of data.
-'''
-
-# Add some spacing
-''
-''
-
-min_value = gdp_df['Year'].min()
-max_value = gdp_df['Year'].max()
-
-from_year, to_year = st.slider(
-    'Which years are you interested in?',
-    min_value=min_value,
-    max_value=max_value,
-    value=[min_value, max_value])
-
-countries = gdp_df['Country Code'].unique()
-
-if not len(countries):
-    st.warning("Select at least one country")
-
-selected_countries = st.multiselect(
-    'Which countries would you like to view?',
-    countries,
-    ['DEU', 'FRA', 'GBR', 'BRA', 'MEX', 'JPN'])
-
-''
-''
-''
-
-# Filter the data
-filtered_gdp_df = gdp_df[
-    (gdp_df['Country Code'].isin(selected_countries))
-    & (gdp_df['Year'] <= to_year)
-    & (from_year <= gdp_df['Year'])
-]
-
-st.header('GDP over time', divider='gray')
-
-''
-
-st.line_chart(
-    filtered_gdp_df,
-    x='Year',
-    y='GDP',
-    color='Country Code',
+st.sidebar.header("🔍 Dashboard Filters")
+min_date = df_raw["Date"].min().date()
+max_date = df_raw["Date"].max().date()
+date_range = st.sidebar.date_input(
+    "Select Date Range",
+    value=(min_date, max_date),
+    min_value=min_date,
+    max_value=max_date,
 )
 
-''
-''
+selected_regions = st.sidebar.multiselect(
+    "Select Region(s)",
+    options=df_raw["Region"].unique(),
+    default=df_raw["Region"].unique(),
+)
+selected_categories = st.sidebar.multiselect(
+    "Select Category(ies)",
+    options=df_raw["Category"].unique(),
+    default=df_raw["Category"].unique(),
+)
 
+if len(date_range) == 2:
+    start_date, end_date = date_range
+    mask = (
+        (df_raw["Date"].dt.date >= start_date)
+        & (df_raw["Date"].dt.date <= end_date)
+        & (df_raw["Region"].isin(selected_regions))
+        & (df_raw["Category"].isin(selected_categories))
+    )
+    df = df_raw.loc[mask]
+else:
+    df = df_raw.copy()
 
-first_year = gdp_df[gdp_df['Year'] == from_year]
-last_year = gdp_df[gdp_df['Year'] == to_year]
+st.title("📊 Business Intelligence Executive Overview")
+st.markdown("---")
 
-st.header(f'GDP in {to_year}', divider='gray')
+total_revenue = df["Revenue"].sum()
+active_users = df["User_ID"].nunique()
+churn_rate = (
+    (df["Is_Churned"].sum() / len(df) * 100) if len(df) > 0 else 0.0
+)
+avg_ticket_size = df["Revenue"].mean() if len(df) > 0 else 0.0
 
-''
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("Total Revenue", f"${total_revenue:,.2f}")
+col2.metric("Active Users", f"{active_users:,}")
+col3.metric("Churn Rate", f"{churn_rate:.2f}%")
+col4.metric("Avg Ticket Size", f"${avg_ticket_size:,.2f}")
 
-cols = st.columns(4)
+st.markdown("---")
 
-for i, country in enumerate(selected_countries):
-    col = cols[i % len(cols)]
+row1_col1, row1_col2 = st.columns(2)
+with row1_col1:
+    st.subheader("📈 Revenue Trend Over Time")
+    df_trend = (
+        df.groupby(pd.Grouper(key="Date", freq="W"))["Revenue"]
+        .sum()
+        .reset_index()
+    )
+    fig_trend = px.line(
+        df_trend,
+        x="Date",
+        y="Revenue",
+        markers=True,
+        labels={"Revenue": "Revenue ($)", "Date": "Week"},
+    )
+    st.plotly_chart(fig_trend, use_container_width=True)
 
-    with col:
-        first_gdp = first_year[first_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-        last_gdp = last_year[last_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
+with row1_col2:
+    st.subheader("🌍 Revenue by Region")
+    df_region = (
+        df.groupby("Region")["Revenue"]
+        .sum()
+        .reset_index()
+        .sort_values(by="Revenue", ascending=False)
+    )
+    fig_region = px.bar(
+        df_region,
+        x="Region",
+        y="Revenue",
+        color="Region",
+        text_auto=".2s",
+        labels={"Revenue": "Revenue ($)"},
+    )
+    st.plotly_chart(fig_region, use_container_width=True)
 
-        if math.isnan(first_gdp):
-            growth = 'n/a'
-            delta_color = 'off'
-        else:
-            growth = f'{last_gdp / first_gdp:,.2f}x'
-            delta_color = 'normal'
+row2_col1, row2_col2 = st.columns(2)
+with row2_col1:
+    st.subheader("💼 Revenue Share by Category")
+    df_category = df.groupby("Category")["Revenue"].sum().reset_index()
+    fig_category = px.pie(df_category, names="Category", values="Revenue", hole=0.4)
+    st.plotly_chart(fig_category, use_container_width=True)
 
-        st.metric(
-            label=f'{country} GDP',
-            value=f'{last_gdp:,.0f}B',
-            delta=growth,
-            delta_color=delta_color
-        )
+with row2_col2:
+    st.subheader("📊 Average Deal Size Heatmap")
+    df_heatmap = df.groupby(["Region", "Category"])["Revenue"].mean().unstack()
+    fig_heatmap = px.imshow(
+        df_heatmap,
+        text_auto=".0f",
+        aspect="auto",
+        labels=dict(x="Category", y="Region", color="Avg Ticket ($)"),
+    )
+    st.plotly_chart(fig_heatmap, use_container_width=True)
