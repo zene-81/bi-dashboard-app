@@ -1,19 +1,13 @@
-# :earth_americas: GDP dashboard template
+# Executive Business Intelligence Dashboard
 
-A simple Streamlit app showing the GDP of different countries in the world.
+Un tableau de bord interactif de Business Intelligence construit avec Streamlit et Plotly.
 
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://gdp-dashboard-template.streamlit.app/)
+## Fonctionnalités
+- **KPIs Principaux** : Chiffre d'affaires total, Utilisateurs actifs, Taux de churn (résiliation), Panier moyen.
+- **Filtres Dynamiques** : Sélection de dates, régions géographiques et segments de clients.
+- **Visualisations Interactives** : Tendances des revenus, répartition régionale, parts de marché par catégorie et cartes thermiques (heatmaps).
 
-### How to run it on your own machine
-
-1. Install the requirements
-
-   ```
-   $ pip install -r requirements.txt
-   ```
-
-2. Run the app
-
-   ```
-   $ streamlit run streamlit_app.py
-   ```
+## Exécution en local
+```bash
+pip install -r requirements.txt
+streamlit run streamlit_app.py
